@@ -9,8 +9,6 @@ from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
 from kivymd.uix.list import MDList, OneLineListItem
 
-Window.size = (350, 550)
-
 
 class CalculatorScreen(Screen):
 
