@@ -113,7 +113,6 @@ class CalculatorScreen(Screen):
         self.scroll.add_widget(self.history_list)
         self.bottom_sheet_layout.add_widget(self.scroll)
         self.bottom_sheet.add_widget(self.bottom_sheet_layout)
-        self.add_widget(self.bottom_sheet)
 
     def press_button(self, button_instance):
         char = button_instance.text
