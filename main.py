@@ -1,13 +1,41 @@
 from kivy.core.window import Window
+from kivy.graphics import Color, Rectangle
+from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.widget import Widget
+from kivy.utils import platform
 from kivymd.app import MDApp
-from kivymd.uix.bottomsheet import MDBottomSheet
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDFillRoundFlatButton, MDIconButton, MDRoundFlatButton
 from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
 from kivymd.uix.list import MDList, OneLineListItem
+
+if platform not in ("android", "ios"):
+    Window.size = (350, 550)
+
+
+class Scrim(Widget):
+    """Fondo semi-transparente: al tocarlo, cierra el panel de historial."""
+
+    def __init__(self, on_dismiss, **kwargs):
+        super().__init__(**kwargs)
+        self.on_dismiss = on_dismiss
+        with self.canvas:
+            Color(0, 0, 0, 0.5)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self._update_rect, size=self._update_rect)
+
+    def _update_rect(self, *args):
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            self.on_dismiss()
+            return True
+        return super().on_touch_down(touch)
 
 
 class CalculatorScreen(Screen):
@@ -15,6 +43,7 @@ class CalculatorScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.history_data = []
+        self.history_overlay = None
 
         main_layout = MDBoxLayout(
             orientation="vertical",
@@ -103,8 +132,6 @@ class CalculatorScreen(Screen):
         main_layout.add_widget(buttons_grid)
         self.add_widget(main_layout)
 
-        self.bottom_sheet = None
-
     def press_button(self, button_instance):
         char = button_instance.text
         if self.display.text == "0" and char != ".":
@@ -142,25 +169,44 @@ class CalculatorScreen(Screen):
             self.display.text = "Error"
 
     def open_history(self, button_instance):
-        self.bottom_sheet = MDBottomSheet(size_hint_y=0.45)
-        bottom_sheet_layout = MDBoxLayout(orientation="vertical", padding="10dp")
+        if self.history_overlay:
+            return  
+
+        self.history_overlay = FloatLayout()
+
+        scrim = Scrim(on_dismiss=self.close_history, size_hint=(1, 1))
+        self.history_overlay.add_widget(scrim)
+
+        panel = MDBoxLayout(
+            orientation="vertical",
+            padding="10dp",
+            spacing="10dp",
+            size_hint=(1, 0.45),
+            pos_hint={"x": 0, "y": 0},
+            md_bg_color=[1, 1, 1, 1],
+        )
+
         scroll = ScrollView()
-        self.history_list = MDList()
+        history_list = MDList()
 
         if not self.history_data:
-            self.history_list.add_widget(
-                OneLineListItem(text="History is empty")
-            )
+            history_list.add_widget(OneLineListItem(text="History is empty"))
         else:
             for operation in reversed(self.history_data):
                 item = OneLineListItem(text=operation)
                 item.bind(on_release=self.recover_result)
-                self.history_list.add_widget(item)
+                history_list.add_widget(item)
 
-        scroll.add_widget(self.history_list)
-        bottom_sheet_layout.add_widget(scroll)
-        self.bottom_sheet.add_widget(bottom_sheet_layout)
-        self.bottom_sheet.open()
+        scroll.add_widget(history_list)
+        panel.add_widget(scroll)
+        self.history_overlay.add_widget(panel)
+
+        self.add_widget(self.history_overlay)
+
+    def close_history(self):
+        if self.history_overlay:
+            self.remove_widget(self.history_overlay)
+            self.history_overlay = None
 
     def recover_result(self, item_instance):
         try:
@@ -169,8 +215,7 @@ class CalculatorScreen(Screen):
         except IndexError:
             pass
         finally:
-            if self.bottom_sheet:
-                self.bottom_sheet.dismiss()
+            self.close_history()
 
 
 class CalculatorApp(MDApp):
